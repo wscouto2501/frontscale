@@ -2,9 +2,6 @@
 
 set -e
 
-MAX_TENTATIVAS=5
-TENTATIVA=1
-
 echo "🚀 Setup Frontscale (modo completo)"
 
 # ================================
@@ -17,60 +14,42 @@ echo ""
 
 ENV_INPUT=$(cat)
 
-# filtra apenas export
-CLEAN_ENV=$(echo "$ENV_INPUT" | grep '^export ')
+# limpa espaços e pega export
+CLEAN_ENV=$(echo "$ENV_INPUT" | sed 's/^[[:space:]]*//' | grep '^export ')
 
 if [ -z "$CLEAN_ENV" ]; then
   echo "❌ Nenhuma variável válida encontrada"
   exit 1
 fi
 
-# salva no bashrc
 echo "💾 Salvando variáveis no ~/.bashrc..."
 
+# remove duplicadas
 while IFS= read -r line; do
   VAR_NAME=$(echo "$line" | cut -d '=' -f1 | sed 's/export //')
-  sed -i "/$VAR_NAME=/d" ~/.bashrc
+  sed -i "/^export $VAR_NAME=/d" ~/.bashrc || true
 done <<< "$CLEAN_ENV"
 
+# adiciona no final
 echo "" >> ~/.bashrc
 echo "# FRONT SCALE ENV" >> ~/.bashrc
 echo "$CLEAN_ENV" >> ~/.bashrc
 
-source ~/.bashrc
+# ================================
+# ⚡ APLICAR IMEDIATAMENTE
+# ================================
+echo "$CLEAN_ENV" > /tmp/frontscale_env.sh
+source /tmp/frontscale_env.sh
 
-while [ -z "$DATABASE_URL" ] && [ $TENTATIVA -le $MAX_TENTATIVAS ]; do
-  echo "🔄 Tentando carregar variáveis ($TENTATIVA/$MAX_TENTATIVAS)..."
-  
-  source ~/.bashrc
-  
-  sleep 1
-  TENTATIVA=$((TENTATIVA + 1))
-done
-
-# valida final
-if [ -z "$DATABASE_URL" ]; then
-  echo "❌ DATABASE_URL não definido após várias tentativas"
-  exit 1
-fi
-
-echo "✅ Variáveis carregadas com sucesso!"
-
-
-
-
-
-
-
-
-
-
-
-# valida
+# ================================
+# 🧪 VALIDAÇÃO
+# ================================
 if [ -z "$DATABASE_URL" ]; then
   echo "❌ DATABASE_URL não definido"
   exit 1
 fi
+
+echo "✅ Variáveis carregadas com sucesso!"
 
 # ================================
 # 📥 MIGRATION.SQL
