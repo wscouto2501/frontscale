@@ -1,0 +1,160 @@
+#!/bin/bash
+
+set -e
+
+echo "🚀 Setup Frontscale (modo completo)"
+
+# ================================
+# 📥 VARIÁVEIS DE AMBIENTE
+# ================================
+echo ""
+echo "📋 Cole TODAS as variáveis (formato: export VAR=valor)"
+echo "👉 Quando terminar, pressione CTRL + D"
+echo ""
+
+ENV_INPUT=$(cat)
+
+# filtra apenas export
+CLEAN_ENV=$(echo "$ENV_INPUT" | grep '^export ')
+
+if [ -z "$CLEAN_ENV" ]; then
+  echo "❌ Nenhuma variável válida encontrada"
+  exit 1
+fi
+
+# salva no bashrc
+echo "💾 Salvando variáveis no ~/.bashrc..."
+
+while IFS= read -r line; do
+  VAR_NAME=$(echo "$line" | cut -d '=' -f1 | sed 's/export //')
+  sed -i "/$VAR_NAME=/d" ~/.bashrc
+done <<< "$CLEAN_ENV"
+
+echo "" >> ~/.bashrc
+echo "# FRONT SCALE ENV" >> ~/.bashrc
+echo "$CLEAN_ENV" >> ~/.bashrc
+
+source ~/.bashrc
+
+# valida
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ DATABASE_URL não definido"
+  exit 1
+fi
+
+# ================================
+# 📥 MIGRATION.SQL
+# ================================
+echo ""
+echo "🧬 Cole o conteúdo do migration.sql"
+echo "👉 Quando terminar, pressione CTRL + D"
+echo ""
+
+MIGRATION_SQL=$(cat)
+
+if [ -z "$MIGRATION_SQL" ]; then
+  echo "❌ migration.sql vazio"
+  exit 1
+fi
+
+# ================================
+# 🟢 Sistema base
+# ================================
+apt update && apt upgrade -y
+
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs unzip nginx postgresql postgresql-contrib
+
+npm install -g pnpm pm2
+
+systemctl enable postgresql
+systemctl start postgresql
+
+# ================================
+# 🐘 Banco
+# ================================
+echo "🗄️ Criando banco..."
+
+sudo -u postgres psql <<EOF
+CREATE USER $PGUSER WITH PASSWORD '$PGPASSWORD';
+CREATE DATABASE $PGDATABASE OWNER $PGUSER;
+GRANT ALL PRIVILEGES ON DATABASE $PGDATABASE TO $PGUSER;
+EOF
+
+# ================================
+# 📁 Projeto
+# ================================
+cd /root
+
+git clone https://github.com/wscouto2501/Front-Scale.git frontscale
+cd frontscale
+
+# ================================
+# 💾 salvar migration.sql
+# ================================
+echo "$MIGRATION_SQL" > migration.sql
+
+# ================================
+# 📦 Dependências
+# ================================
+pnpm install
+
+# ================================
+# 🧬 Rodar migration
+# ================================
+psql "$DATABASE_URL" -f migration.sql || true
+pnpm --filter @workspace/db run migrate || true
+
+# ================================
+# 🏗️ Build
+# ================================
+pnpm --filter @workspace/frontscale run build
+pnpm --filter @workspace/api-server run build
+
+# ================================
+# 📁 Frontend
+# ================================
+mkdir -p /var/www/frontscale
+cp -r /root/frontscale/artifacts/frontscale/dist/public/* /var/www/frontscale/ || true
+
+# ================================
+# 🚀 PM2
+# ================================
+pm2 start /root/frontscale/artifacts/api-server/dist/index.cjs --name frontscale
+pm2 save
+pm2 startup
+
+# ================================
+# 🌐 NGINX
+# ================================
+cat <<EOF > /etc/nginx/sites-available/frontscale
+server {
+    listen 80;
+    server_name $SITE_BASE_URL;
+
+    location / {
+        root /var/www/frontscale;
+        index index.html;
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+ln -sf /etc/nginx/sites-available/frontscale /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+nginx -t
+systemctl restart nginx
+
+echo ""
+echo "✅ INSTALAÇÃO FINALIZADA!"
+echo "🌐 Acesse: $SITE_BASE_URL"
