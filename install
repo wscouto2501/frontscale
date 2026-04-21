@@ -2,6 +2,9 @@
 
 set -e
 
+MAX_TENTATIVAS=5
+TENTATIVA=1
+
 echo "🚀 Setup Frontscale (modo completo)"
 
 # ================================
@@ -35,6 +38,33 @@ echo "# FRONT SCALE ENV" >> ~/.bashrc
 echo "$CLEAN_ENV" >> ~/.bashrc
 
 source ~/.bashrc
+
+while [ -z "$DATABASE_URL" ] && [ $TENTATIVA -le $MAX_TENTATIVAS ]; do
+  echo "🔄 Tentando carregar variáveis ($TENTATIVA/$MAX_TENTATIVAS)..."
+  
+  source ~/.bashrc
+  
+  sleep 1
+  TENTATIVA=$((TENTATIVA + 1))
+done
+
+# valida final
+if [ -z "$DATABASE_URL" ]; then
+  echo "❌ DATABASE_URL não definido após várias tentativas"
+  exit 1
+fi
+
+echo "✅ Variáveis carregadas com sucesso!"
+
+
+
+
+
+
+
+
+
+
 
 # valida
 if [ -z "$DATABASE_URL" ]; then
