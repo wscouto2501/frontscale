@@ -60,7 +60,7 @@ echo "👉 Quando terminar, pressione CTRL + D"
 echo ""
 
 
-cat <<'EOF' > migration.sql
+cat <<'EOF' > \root\migration.sql
 CREATE SCHEMA "public";
 CREATE SCHEMA "stripe";
 CREATE TYPE "stripe"."pricing_type" AS ENUM('one_time', 'recurring');
@@ -1175,10 +1175,13 @@ CREATE DATABASE $PGDATABASE OWNER $PGUSER;
 GRANT ALL PRIVILEGES ON DATABASE $PGDATABASE TO $PGUSER;
 EOF
 
+cd /root
+
+psql "$DATABASE_URL" -f migration.sql || true
 # ================================
 # 📁 Projeto
 # ================================
-cd /root
+
 
 git clone https://github.com/wscouto2501/Front-Scale.git frontscale
 cd frontscale
@@ -1191,7 +1194,7 @@ pnpm install
 # ================================
 # 🧬 Rodar migration
 # ================================
-psql "$DATABASE_URL" -f migration.sql || true
+
 pnpm --filter @workspace/db run migrate || true
 
 # ================================
