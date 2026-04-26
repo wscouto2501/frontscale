@@ -142,6 +142,8 @@ EOF
 ln -sf /etc/nginx/sites-available/frontscale /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 
+source ~/.bashrc
+
 nginx -t
 systemctl restart nginx
 
