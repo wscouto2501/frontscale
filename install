@@ -119,7 +119,7 @@ pm2 startup
 # ================================
 cat <<EOF > /etc/nginx/sites-available/frontscale
 server {
-    listen 80;
+    listen 81;
     server_name $SITE_BASE_URL;
 
     location / {
