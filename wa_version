@@ -1,0 +1,84 @@
+#!/bin/bash
+
+set -e
+
+API_DIR="/root/frontscale/artifacts/api-server"
+BASHRC="/root/.bashrc"
+SCRIPT_FILE="/usr/local/bin/update-wa-version.sh"
+CRON_LOG="/var/log/update-wa-version.log"
+
+cat > "$SCRIPT_FILE" <<'EOF'
+#!/bin/bash
+
+set -e
+
+API_DIR="/root/frontscale/artifacts/api-server"
+BASHRC="/root/.bashrc"
+
+echo "[$(date)] Verificando versão do WhatsApp Web..."
+
+NEW_VERSION=$(
+cd "$API_DIR"
+
+pnpm exec node --input-type=module -e '
+import { fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
+
+const result = await fetchLatestBaileysVersion();
+console.log(result.version.join("."));
+' | tail -n 1
+)
+
+if [ -z "$NEW_VERSION" ]; then
+    echo "Erro: não foi possível obter a versão."
+    exit 1
+fi
+
+CURRENT_VERSION=$(grep '^export WA_VERSION=' "$BASHRC" 2>/dev/null | cut -d= -f2 || true)
+
+echo "Versão atual: ${CURRENT_VERSION:-não definida}"
+echo "Versão nova : $NEW_VERSION"
+
+if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
+    echo "Nenhuma alteração necessária."
+    exit 0
+fi
+
+if grep -q '^export WA_VERSION=' "$BASHRC" 2>/dev/null; then
+    sed -i "s/^export WA_VERSION=.*/export WA_VERSION=$NEW_VERSION/" "$BASHRC"
+else
+    echo "" >> "$BASHRC"
+    echo "export WA_VERSION=$NEW_VERSION" >> "$BASHRC"
+fi
+
+export WA_VERSION="$NEW_VERSION"
+
+echo "WA_VERSION atualizada para $NEW_VERSION"
+
+if command -v pm2 >/dev/null 2>&1; then
+    pm2 restart all --update-env
+    echo "PM2 reiniciado."
+else
+    echo "PM2 não encontrado. Reinício ignorado."
+fi
+
+echo "Concluído."
+EOF
+
+chmod +x "$SCRIPT_FILE"
+
+(
+crontab -l 2>/dev/null | grep -v "$SCRIPT_FILE"
+echo "0 3 * * * $SCRIPT_FILE >> $CRON_LOG 2>&1"
+) | crontab -
+
+echo
+echo "========================================"
+echo "Instalação concluída"
+echo "========================================"
+echo "Script : $SCRIPT_FILE"
+echo "Cron   : Todos os dias às 03:00"
+echo "Log    : $CRON_LOG"
+echo
+echo "Teste manual:"
+echo "$SCRIPT_FILE"
+echo
