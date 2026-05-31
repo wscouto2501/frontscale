@@ -11,6 +11,8 @@ CRON_LOG="/var/log/update-wa-version.log"
 
 apt update
 apt install -y cron
+systemctl enable cron
+systemctl start cron
 
 cat > "$SCRIPT_FILE" <<'EOF'
 #!/bin/bash
