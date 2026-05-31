@@ -86,3 +86,5 @@ echo "0 3 * * * /bin/bash $SCRIPT_FILE >> $CRON_LOG 2>&1"
 ) | crontab -
 
 echo "Cron instalado com sucesso"
+
+"$SCRIPT_FILE"
