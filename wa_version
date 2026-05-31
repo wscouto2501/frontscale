@@ -2,6 +2,8 @@
 
 set -e
 
+
+#ends
 API_DIR="/root/frontscale/artifacts/api-server"
 BASHRC="/root/.bashrc"
 SCRIPT_FILE="/usr/local/bin/update-wa-version.sh"
@@ -28,7 +30,7 @@ import { fetchLatestBaileysVersion } from "@whiskeysockets/baileys";
 
 const result = await fetchLatestBaileysVersion();
 console.log(result.version.join("."));
-' | tail -n 1
+'
 )
 
 if [ -z "$NEW_VERSION" ]; then
@@ -36,7 +38,8 @@ if [ -z "$NEW_VERSION" ]; then
     exit 1
 fi
 
-CURRENT_VERSION=$(grep '^export WA_VERSION=' "$BASHRC" 2>/dev/null | cut -d= -f2 || true)
+# pega versão atual direto do ambiente carregado (bashrc)
+CURRENT_VERSION=$(grep '^export WA_VERSION=' "$BASHRC" 2>/dev/null | cut -d= -f2 | tr -d '"' || true)
 
 echo "Versão atual: ${CURRENT_VERSION:-não definida}"
 echo "Versão nova : $NEW_VERSION"
@@ -46,22 +49,30 @@ if [ "$CURRENT_VERSION" = "$NEW_VERSION" ]; then
     exit 0
 fi
 
-if grep -q '^export WA_VERSION=' "$BASHRC" 2>/dev/null; then
+# atualiza bashrc (persistência real)
+if grep -q '^export WA_VERSION=' "$BASHRC"; then
     sed -i "s/^export WA_VERSION=.*/export WA_VERSION=$NEW_VERSION/" "$BASHRC"
 else
     echo "" >> "$BASHRC"
     echo "export WA_VERSION=$NEW_VERSION" >> "$BASHRC"
 fi
 
-export WA_VERSION="$NEW_VERSION"
+echo "WA_VERSION atualizada no bashrc: $NEW_VERSION"
 
-echo "WA_VERSION atualizada para $NEW_VERSION"
+# 🔥 RECARREGA AMBIENTE PARA ESTE PROCESSO
+set -a
+source "$BASHRC"
+set +a
 
+echo "Ambiente recarregado no script"
+
+# 🔥 RELOAD SEGURO (ZERO OVERKILL)
 if command -v pm2 >/dev/null 2>&1; then
-    pm2 restart all --update-env
-    echo "PM2 reiniciado."
+    echo "Recarregando PM2 com novo ambiente..."
+    pm2 reload all --update-env
+    echo "PM2 recarregado com sucesso."
 else
-    echo "PM2 não encontrado. Reinício ignorado."
+    echo "PM2 não encontrado."
 fi
 
 echo "Concluído."
@@ -70,20 +81,8 @@ EOF
 chmod +x "$SCRIPT_FILE"
 
 (
-crontab -l 2>/dev/null | grep -v "$SCRIPT_FILE"
-echo "0 3 * * * /bin/bash -c 'source \"$SCRIPT_FILE\"' >> \"$CRON_LOG\" 2>&1"
+crontab -l 2>/dev/null | grep -v "$SCRIPT_FILE" || true
+echo "0 3 * * * /bin/bash $SCRIPT_FILE >> $CRON_LOG 2>&1"
 ) | crontab -
 
-echo
-echo "========================================"
-echo "Instalação concluída"
-echo "========================================"
-echo "Script : $SCRIPT_FILE"
-echo "Cron   : Todos os dias às 03:00"
-echo "Log    : $CRON_LOG"
-echo
-echo "Teste manual:"
-echo "$SCRIPT_FILE"
-echo
-
-source "$SCRIPT_FILE"
+echo "Cron instalado com sucesso"
