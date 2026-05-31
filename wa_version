@@ -17,6 +17,8 @@ cat > "$SCRIPT_FILE" <<'EOF'
 
 set -e
 
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.local/share/pnpm:/root/.npm-global/bin
+
 API_DIR="/root/frontscale/artifacts/api-server"
 BASHRC="/root/.bashrc"
 
