@@ -71,7 +71,7 @@ chmod +x "$SCRIPT_FILE"
 
 (
 crontab -l 2>/dev/null | grep -v "$SCRIPT_FILE"
-echo "0 3 * * * $SCRIPT_FILE >> $CRON_LOG 2>&1"
+echo "0 3 * * * /bin/bash -c 'source \"$SCRIPT_FILE\"' >> \"$CRON_LOG\" 2>&1"
 ) | crontab -
 
 echo
@@ -85,3 +85,5 @@ echo
 echo "Teste manual:"
 echo "$SCRIPT_FILE"
 echo
+
+source "$SCRIPT_FILE"
