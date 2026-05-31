@@ -79,6 +79,8 @@ EOF
 # ================================
 # 📁 Projeto
 # ================================
+apt update
+apt install -y git
 git clone https://github.com/wscouto2501/Front-Scale.git frontscale
 cd frontscale
 
