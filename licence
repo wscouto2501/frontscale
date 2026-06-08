@@ -1,13 +1,16 @@
 #!/bin/bash
 
-set -e
+read -p "Host do banco: " DB_HOST
+read -p "Nome do banco: " DB_NAME
+read -p "Usuário do banco: " DB_USER
+read -s -p "Senha do banco: " PGPASSWORD
+echo
 
-DB_NAME="frontscale"
-DB_USER="frontscale"
+export PGPASSWORD
 
 echo "Atualizando subscription_status para active..."
 
-psql -U "$DB_USER" -d "$DB_NAME" <<'SQL'
+psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" <<'SQL'
 UPDATE users
 SET subscription_status = 'active';
 SQL
